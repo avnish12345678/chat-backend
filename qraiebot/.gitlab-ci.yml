@@ -1,0 +1,140 @@
+
+stages:
+  - lint
+  - validate
+  - build-preparing
+  - testing
+  - deploy_common_resources
+  - build-and-push
+  - deploy_dev
+  - deploy
+  - restart
+  - deploy_live  
+
+
+# 
+variables:
+  IMAGE: $OCI_REGISTRY_IMAGE/$CI_PROJECT_NAME
+  GATEWAY_IMAGE: "qraie-api-gateway"
+  MICROSERVICE_IMAGE: "qraiebot-microservice"
+  # Define the versioning variables
+  MAJOR_VERSION: "1"
+  YEAR_VERSION: "24"
+  MONTH_VERSION: "1"
+  # YEAR_VERSION: "$(date +%y)"
+  # MONTH_VERSION: "$(date +%m)"
+  RELEASE_NUMBER: "$CI_PIPELINE_ID"
+  # VERSION: "$MAJOR_VERSION.$YEAR_VERSION.$MONTH_VERSION.$RELEASE_NUMBER"
+  VERSION: "latest"
+
+docker_compose_validate:
+  stage: validate
+  image: docker:latest
+  services:
+    - docker:dind
+  variables:
+    DOCKER_DRIVER: overlay2
+  script:
+    - docker-compose -f docker-compose.yml config
+  rules:
+    - changes:
+        # - .gitlab-ci.yml
+        - docker-compose.yml
+
+
+custom_validations:
+  stage: validate
+  image: rahul731/yaml-validator
+  script:
+    - python3 /app/validate-compose.py docker-compose.yml
+  variables:
+    RESOURCES_CHECK: "WARNING"
+    HEALTHCHECK: "WARNING"
+    PORT_CONFLICT: "ERROR"
+    LOGGING_CHECK: "ERROR"
+  rules:
+    - changes:
+        # - .gitlab-ci.yml 
+        - docker-compose.yml  
+
+
+
+build_and_push_gateway_qraiebot:
+  stage: build-and-push
+  variables:
+    IMAGE: $OCI_REGISTRY_IMAGE/$GATEWAY_IMAGE:qraiebot  
+  tags:
+    - global-live
+  # when: manual
+  script:
+    - docker build -f ./Jira_Revamp_Gateway/Dockerfile -t $IMAGE  .
+    - echo "Logging in to remote Repo"
+    - docker login -u "$OCI_REGISTRY_USER" -p "$OCI_REGISTRY_PASSWORD" $OCI_REGISTRY
+    - echo "pushing Image $IMAGE"
+    - docker push $IMAGE
+  rules:
+    - changes:
+        - "Jira_Revamp_Gateway/*"
+        - "Jira_Revamp_Gateway/**/*"
+        # - .gitlab-ci.yml 
+      # if: $CI_COMMIT_BRANCH == 'dev'
+      # when: manual
+
+
+
+build_and_push_qraiebot-microservice:
+  stage: build-and-push
+  variables:
+    IMAGE: $OCI_REGISTRY_IMAGE/$MICROSERVICE_IMAGE:qraiebot  
+  tags:
+    - global-live
+  # when: manual
+  script:
+    - docker build -f ./Jira_Revamp_MicroSevice/Dockerfile -t $IMAGE  .
+    - echo "Logging in to remote Repo"
+    - docker login -u "$OCI_REGISTRY_USER" -p "$OCI_REGISTRY_PASSWORD" $OCI_REGISTRY
+    - echo "pushing Image $IMAGE"
+    - docker push $IMAGE
+  rules:
+    - changes:
+        - "Jira_Revamp_MicroSevice/*" 
+        - "Jira_Revamp_MicroSevice/**/*"  
+        # - .gitlab-ci.yml 
+      # if: $CI_COMMIT_BRANCH == 'dev'
+      # when: manual
+
+
+deploy_stg_qraiebot:
+  stage: deploy
+  environment:
+    name: stg-qraiebot
+  tags:
+    - global_stg
+  script:
+    - echo "Hi Dev, Please Wait.. while we are deploying your changes on stg"
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+    - apk add --update bash openssh sshpass
+    - timestamp=$(date +"%d_%b_%y_%H_%M_%S")
+    - |
+      if sshpass -p $STG_AI_VM_PWD ssh $STG_AI_VM_USER@$STG_AI_VM_IP "[ -f  /home/stg-docker01/docker/tenants/qraie/docker-compose.yml ]"; then
+          timestamp=$(date +"%d_%b_%y_%H_%M_%S")
+          sshpass -p $STG_AI_VM_PWD ssh $STG_AI_VM_USER@$STG_AI_VM_IP "cp  /home/stg-docker01/docker/tenants/qraie/docker-compose.yml  /home/stg-docker01/docker/tenants/qraie/docker-compose_backup_$timestamp.yml"
+      fi
+    - sshpass -p $STG_AI_VM_PWD scp docker-compose.yml $STG_AI_VM_USER@$STG_AI_VM_IP:/home/stg-docker01/docker/tenants/qraie/docker-compose.yml
+    # - sshpass -p $STG_AI_VM_PWD scp -r docker/configurations/tenants/*qraiebot* $STG_AI_VM_USER@$STG_AI_VM_IP:$STG_TARGET_DOCKER_DIR
+    - sshpass -p $STG_AI_VM_PWD ssh $STG_AI_VM_USER@$STG_AI_VM_IP "cd /home/stg-docker01/docker/tenants/qraie && docker compose pull && docker compose up -d "
+    - echo "~~~~ Staging deployment Job completed ~~~~~"
+  rules:
+    - changes:
+        - "Jira_Revamp_Gateway/*"
+        - "Jira_Revamp_Gateway/**/*"
+        - "Jira_Revamp_MicroSevice/**/*"
+        - "Jira_Revamp_MicroSevice/*"
+        - "**/*"
+        - .gitlab-ci.yml
+      if: $CI_COMMIT_BRANCH == 'dev'
+      when: manual
+
+

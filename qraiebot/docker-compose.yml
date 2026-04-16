@@ -1,0 +1,70 @@
+version: '3.8'
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  redis:
+    image: redis:6.2-alpine
+    #network_mode: host
+    ports:
+      - "6385:6379"
+    container_name: redis
+    restart: always
+    command: redis-server --save 20 1 --loglevel warning --requirepass Hbs52o2oR-STG
+    volumes:
+      - ./redis-data:/data
+
+
+  api-gateway:
+    image: iad.ocir.io/hbssoc/qraie-api-gateway:qraiebot
+    environment:
+      PORT: 8000
+      REDIS_PORT: 6385
+      REDIS_IP: 192.168.85.194
+      REDIS_PASSWORD: "Hbs52o2oR-STG"
+      apiProtocol: "development"
+      serverIPA: "0.0.0.0"
+      VIRTUAL_HOST: qraiebot.qryde.net
+      VIRTUAL_PORT: "8000"
+      NODE_ENV: production
+    #network_mode: host
+    restart: always
+    logging:
+      driver: gelf
+      options:
+        gelf-address: tcp://192.168.85.143:12201
+        tag: api-gateway
+
+  microservice-qraie:
+    image: iad.ocir.io/hbssoc/qraiebot-microservice:qraiebot
+    environment:
+      PORT: 4000
+      REDIS_PORT: 6385
+      REDIS_IP: 192.168.85.194
+      REDIS_PASSWORD: Hbs52o2oR-STG 
+      apiProtocol: "development"
+      serverIPA: "0.0.0.0"
+      BOT_EMAIL: "qraie-jira@hbssweb.com"
+      BOT_TOKEN: "ATATT3xFfGF0LVgO_Jts_Txno0ap0uUqem1QW2WkbghayuVEmbVvjP22jbfMl8iAGLPR7lpjibaRN5N1FYLzX-HML2Wtx_DkpIJBE0Ufb88dWMiHx-EDVDjwIIuY2c4cPA23AHuAwcbtlTeF2_ay5n6w0K1PlEMl0yCanXrVruKIqBReFi5obO:8315DB62"  
+      NODE_ENV: production
+    restart: always
+    #network_mode: host
+    logging:
+      driver: gelf
+      options:
+        gelf-address: tcp://192.168.85.143:12201
+        tag: microservice-qraie

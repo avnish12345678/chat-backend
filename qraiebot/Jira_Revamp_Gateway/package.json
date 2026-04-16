@@ -1,0 +1,15 @@
+{
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "fs": "^0.0.1-security",
+    "http": "^0.0.1-security",
+    "https": "^1.0.0",
+    "node-redis-retry-strategy": "^2.1.1",
+    "path": "^0.12.7",
+    "redis": "^3.1.2",
+    "socket.io": "^4.8.1",
+    "uuid": "^11.0.5"
+  }
+}
