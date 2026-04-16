@@ -58,8 +58,8 @@ services:
       REDIS_PASSWORD: Hbs52o2oR-STG 
       apiProtocol: "development"
       serverIPA: "0.0.0.0"
-      BOT_EMAIL: "qraie-jira@hbssweb.com"
-      BOT_TOKEN: "ATATT3xFfGF0LVgO_Jts_Txno0ap0uUqem1QW2WkbghayuVEmbVvjP22jbfMl8iAGLPR7lpjibaRN5N1FYLzX-HML2Wtx_DkpIJBE0Ufb88dWMiHx-EDVDjwIIuY2c4cPA23AHuAwcbtlTeF2_ay5n6w0K1PlEMl0yCanXrVruKIqBReFi5obO:8315DB62"  
+      BOT_EMAIL: ${BOT_EMAIL:?set BOT_EMAIL in .env or shell}
+      BOT_TOKEN: ${BOT_TOKEN:?set BOT_TOKEN in .env or shell}
       NODE_ENV: production
     restart: always
     #network_mode: host
